@@ -31,8 +31,12 @@ library
                     , semigroupoids >= 4.2 && < 6
                     , lens >= 4.3.3 && < 5
                     , text          
-                    , text1      
+                    , text1
+                    , parsers      
                     , papa
+
+                    , parsec
+                    , QuickCheck
                     
   ghc-options:
                     -Wall
@@ -64,6 +68,7 @@ test-suite doctests
                     , directory >= 1.1
                     , QuickCheck >= 2.0
                     , template-haskell >= 2.8
+                    , parsec >= 3.1
 
   ghc-options:
                     -Wall
