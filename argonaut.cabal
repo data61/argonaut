@@ -29,7 +29,9 @@ library
                     base < 5 && >= 4.8
                     , semigroups >= 0.8 && < 1.0
                     , semigroupoids >= 4.2 && < 6
-                    , lens >= 4.3.3 && < 5                    
+                    , lens >= 4.3.3 && < 5
+                    , text          
+                    , text1      
                     , papa
                     
   ghc-options:
