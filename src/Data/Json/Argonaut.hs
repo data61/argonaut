@@ -9,13 +9,14 @@ module Data.Json.Argonaut where
 
 import Control.Applicative((<|>))
 import Text.Parser.Char
-import Data.Text(Text, pack)
+import Data.Text(Text)
 import Papa
 
 -- $setup
 -- >>> :set -XNoImplicitPrelude
 -- >>> :set -XFlexibleContexts
 -- >>> import Data.Either(isLeft)
+-- >>> import Data.Text(pack)
 -- >>> import Text.Parsec(Parsec, parse)
 -- >>> import Test.QuickCheck(Arbitrary(..))
 
@@ -92,5 +93,3 @@ parseJsonBool ::
 parseJsonBool =
   let b q t = (_JsonBool # q) <$ text t
   in  b False "false" <|> b True "true"
-
-undefined = undefined
