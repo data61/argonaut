@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Data.Json.Argonaut where
 
@@ -15,10 +16,14 @@ import Papa
 -- $setup
 -- >>> :set -XNoImplicitPrelude
 -- >>> :set -XFlexibleContexts
+-- >>> :set -XOverloadedStrings
 -- >>> import Data.Either(isLeft)
 -- >>> import Data.Text(pack)
--- >>> import Text.Parsec(Parsec, parse)
+-- >>> import Data.Text.Arbitrary
+-- >>> import Text.Parsec(Parsec, ParseError, parse)
 -- >>> import Test.QuickCheck(Arbitrary(..))
+-- >>> let testparse :: Parsec Text () a -> Text -> Either ParseError a; testparse p = parse p "test"
+-- >>> let testparsej :: Parsec Text () (Json ()) -> Text -> Either ParseError (Json()); testparsej = testparse
 
 newtype JNumber =
   JNumber {
@@ -26,34 +31,34 @@ newtype JNumber =
       Double
   } deriving (Eq, Ord, Show)
 
-data JAssoc =
+data JAssoc s =
   JAssoc {
     _key ::
       Text
   , _value ::
-      Json
+      Json s
   }
   deriving (Eq, Ord, Show)
 
-newtype JObject =
+newtype JObject s =
   JObject {
     _jobjectL ::
-      [JAssoc]
+      [JAssoc s]
   } deriving (Eq, Ord, Show)
 
-data Json =
-  JsonNull
-  | JsonBool Bool
-  | JsonNumber JNumber
-  | JsonString Text
-  | JsonArray Jsons
-  | JsonObject JObject
+data Json s =
+  JsonNull s
+  | JsonBool Bool s
+  | JsonNumber JNumber s
+  | JsonString Text s
+  | JsonArray (Jsons s) s
+  | JsonObject (JObject s) s
   deriving (Eq, Ord, Show)
 
-newtype Jsons =
+newtype Jsons s =
   Jsons {
     _jsonsL ::
-      [Json]
+      [Json s]
   } deriving (Eq, Ord, Show)
 
 makeClassy ''JNumber
@@ -68,28 +73,29 @@ makeWrapped ''Jsons
 
 -- |
 --
--- >>> parse (parseJsonNull :: Parsec Text () Json) "test" (pack "null")
--- Right JsonNull
+-- >>> testparsej (parseJsonNull (return ())) "null" 
+-- Right (JsonNull ())
 --
--- prop> x /= "null" ==> isLeft (parse (parseJsonNull :: Parsec Text () Json) "test" (pack x))
+-- prop> x /= "null" ==> isLeft (testparsej (parseJsonNull (return ())) x)
 parseJsonNull ::
-  (AsJson a, CharParsing f) =>
-  f a
-parseJsonNull =
-  (_JsonNull # ()) <$ text "null"
+  (AsJson a s, CharParsing f) =>
+  f s -> f a
+parseJsonNull p =
+  (_JsonNull #) <$ text "null" <*> p
 
 -- |
 --
--- >>> parse (parseJsonBool :: Parsec Text () Json) "test" (pack "false")
--- Right (JsonBool False)
+-- >>> testparsej (parseJsonBool (return ())) "true" 
+-- Right (JsonBool True ())
 --
--- >>> parse (parseJsonBool :: Parsec Text () Json) "test" (pack "true")
--- Right (JsonBool True)
+-- >>> testparsej (parseJsonBool (return ())) "false" 
+-- Right (JsonBool False ())
 --
--- prop> (x `notElem` ["true", "false"]) ==> isLeft (parse (parseJsonBool :: Parsec Text () Json) "test" (pack x))
+-- prop> (x `notElem` ["true", "false"]) ==> isLeft (testparsej (parseJsonBool (return ())) x)
 parseJsonBool ::
-  (AsJson a, CharParsing f) =>
-  f a
-parseJsonBool =
-  let b q t = (_JsonBool # q) <$ text t
+  (AsJson a s, CharParsing f) =>
+  f s
+  -> f a
+parseJsonBool p =
+  let b q t = (\r -> _JsonBool # (q, r)) <$ text t <*> p
   in  b False "false" <|> b True "true"

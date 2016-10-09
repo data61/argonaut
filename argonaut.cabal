@@ -69,6 +69,7 @@ test-suite doctests
                     , QuickCheck >= 2.0
                     , template-haskell >= 2.8
                     , parsec >= 3.1
+                    , quickcheck-text
 
   ghc-options:
                     -Wall
