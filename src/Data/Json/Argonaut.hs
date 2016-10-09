@@ -79,7 +79,8 @@ makeWrapped ''Jsons
 -- prop> x /= "null" ==> isLeft (testparsej (parseJsonNull (return ())) x)
 parseJsonNull ::
   (AsJson a s, CharParsing f) =>
-  f s -> f a
+  f s
+  -> f a
 parseJsonNull p =
   (_JsonNull #) <$ text "null" <*> p
 
