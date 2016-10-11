@@ -23,7 +23,152 @@ import Papa
 -- >>> import Text.Parsec(Parsec, ParseError, parse)
 -- >>> import Test.QuickCheck(Arbitrary(..))
 -- >>> let testparse :: Parsec Text () a -> Text -> Either ParseError a; testparse p = parse p "test"
--- >>> let testparsej :: Parsec Text () (Json ()) -> Text -> Either ParseError (Json()); testparsej = testparse
+
+
+----
+
+data HexDigit =
+  D0
+  | D1
+  | D2
+  | D3
+  | D4
+  | D5
+  | D6
+  | D7
+  | D8
+  | D9
+  | Da
+  | Db
+  | Dc
+  | Dd
+  | De
+  | Df
+  | DA
+  | DB
+  | DC
+  | DD
+  | DE
+  | DF
+  deriving (Eq, Ord)
+
+instance Show HexDigit where
+  show D0 =
+    "0"
+  show D1 =
+    "1"
+  show D2 =
+    "2"
+  show D3 =
+    "3"
+  show D4 =
+    "4"
+  show D5 =
+    "5"
+  show D6 =
+    "6"
+  show D7 =
+    "7"
+  show D8 =
+    "8"
+  show D9 =
+    "9"
+  show Da =
+    "a"
+  show Db =
+    "b"
+  show Dc =
+    "c"
+  show Dd =
+    "d"
+  show De =
+    "e"
+  show Df =
+    "f"
+  show DA =
+    "A"
+  show DB =
+    "B"
+  show DC =
+    "C"
+  show DD =
+    "D"
+  show DE =
+    "E"
+  show DF =
+    "F"
+    
+data HexDigit4 =
+  HexDigit4
+    HexDigit
+    HexDigit
+    HexDigit
+    HexDigit
+  deriving (Eq, Ord)
+
+instance Show HexDigit4 where
+  show (HexDigit4 d1 d2 d3 d4) =
+    concat
+      [
+        show d1
+      , show d2
+      , show d3
+      , show d4
+      ]
+
+newtype JCharUnescaped =
+  JCharUnescaped
+    Char
+  deriving (Eq, Ord, Show)
+
+class HasJCharUnescaped a where
+  jCharUnescaped ::
+    Lens'
+      a
+      JCharUnescaped
+
+instance HasJCharUnescaped JCharUnescaped where
+  jCharUnescaped =
+    id
+
+class AsJCharUnescaped a where
+  _JCharUnescaped ::
+    Prism'
+      a
+      JCharUnescaped
+
+instance AsJCharUnescaped JCharUnescaped where
+  _JCharUnescaped =
+    id
+
+instance AsJCharUnescaped Char where
+  _JCharUnescaped =
+    prism'
+      (\(JCharUnescaped c) -> c)
+      (\c ->  if any (\f -> f c) [(== '"'), (== '\\'), (\x -> x >= '\x00' && x <= '\x1f')]
+                then
+                  Nothing
+                else
+                  Just (JCharUnescaped c)
+      )
+
+data JChar =
+  QuotationMark
+  | ReverseSolidus
+  | Solidus
+  | Backspace
+  | FormFeed
+  | LineFeed
+  | CarriageReturn
+  | Tab
+  | Hex HexDigit4
+  | Unescaped JCharUnescaped
+  deriving (Eq, Ord, Show)
+
+newtype JString =
+  JString
+    [JChar]
+  deriving (Eq, Ord, Show)
 
 newtype JNumber =
   JNumber {
@@ -46,11 +191,12 @@ newtype JObject s =
       [JAssoc s]
   } deriving (Eq, Ord, Show)
 
+--  http://rfc7159.net/rfc7159
 data Json s =
   JsonNull s
   | JsonBool Bool s
   | JsonNumber JNumber s
-  | JsonString Text s
+  | JsonString JString s
   | JsonArray (Jsons s) s
   | JsonObject (JObject s) s
   deriving (Eq, Ord, Show)
@@ -61,6 +207,13 @@ newtype Jsons s =
       [Json s]
   } deriving (Eq, Ord, Show)
 
+
+makeClassy ''HexDigit
+makeClassyPrisms ''HexDigit
+makeClassy ''HexDigit4
+makeClassy ''JChar
+makeClassyPrisms ''JChar
+makeWrapped ''JString
 makeClassy ''JNumber
 makeWrapped ''JNumber
 makeClassy ''JAssoc
@@ -73,30 +226,32 @@ makeWrapped ''Jsons
 
 -- |
 --
--- >>> testparsej (parseJsonNull (return ())) "null" 
+-- >>> testparse (parseJsonNull (return ())) "null" 
 -- Right (JsonNull ())
 --
--- prop> x /= "null" ==> isLeft (testparsej (parseJsonNull (return ())) x)
+-- prop> x /= "null" ==> isLeft (testparse (parseJsonNull (return ())) x)
 parseJsonNull ::
-  (AsJson a s, CharParsing f) =>
+  CharParsing f =>
   f s
-  -> f a
+  -> f (Json s)
 parseJsonNull p =
-  (_JsonNull #) <$ text "null" <*> p
+  JsonNull <$ text "null" <*> p
 
 -- |
 --
--- >>> testparsej (parseJsonBool (return ())) "true" 
+-- >>> testparse (parseJsonBool (return ())) "true" 
 -- Right (JsonBool True ())
 --
--- >>> testparsej (parseJsonBool (return ())) "false" 
+-- >>> testparse (parseJsonBool (return ())) "false" 
 -- Right (JsonBool False ())
 --
--- prop> (x `notElem` ["true", "false"]) ==> isLeft (testparsej (parseJsonBool (return ())) x)
+-- prop> (x `notElem` ["true", "false"]) ==> isLeft (testparse (parseJsonBool (return ())) x)
 parseJsonBool ::
-  (AsJson a s, CharParsing f) =>
+  CharParsing f =>
   f s
-  -> f a
+  -> f (Json s)
 parseJsonBool p =
-  let b q t = (\r -> _JsonBool # (q, r)) <$ text t <*> p
+  let b q t = JsonBool q <$ text t <*> p
   in  b False "false" <|> b True "true"
+
+-- parseHexDigit, parseHexDigitCase, parseHexDigit4, parseJCharUnescaped, parseJChar
