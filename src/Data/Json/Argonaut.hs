@@ -9,6 +9,7 @@
 module Data.Json.Argonaut where
 
 import Control.Applicative((<|>))
+import Data.Foldable(asum)
 import Text.Parser.Char
 import Data.Text(Text)
 import Papa
@@ -254,4 +255,62 @@ parseJsonBool p =
   let b q t = JsonBool q <$ text t <*> p
   in  b False "false" <|> b True "true"
 
--- parseHexDigit, parseHexDigitCase, parseHexDigit4, parseJCharUnescaped, parseJChar
+-- |
+--
+-- >>> testparse parseHexDigit "0" 
+-- Right 0
+--
+-- >>> testparse parseHexDigit "1" 
+-- Right 1
+--
+-- >>> testparse parseHexDigit "9" 
+-- Right 9
+--
+-- >>> testparse parseHexDigit "a" 
+-- Right a
+--
+-- >>> testparse parseHexDigit "f" 
+-- Right f
+--
+-- >>> testparse parseHexDigit "A" 
+-- Right A
+--
+-- >>> testparse parseHexDigit "F" 
+-- Right F
+parseHexDigit ::
+  CharParsing f =>
+  f HexDigit
+parseHexDigit =
+  asum
+    [
+      D0 <$ char '0'
+    , D1 <$ char '1'
+    , D2 <$ char '2'
+    , D3 <$ char '3'
+    , D4 <$ char '4'
+    , D5 <$ char '5'
+    , D6 <$ char '6'
+    , D7 <$ char '7'
+    , D8 <$ char '8'
+    , D9 <$ char '9'
+    , Da <$ char 'a'
+    , Db <$ char 'b'
+    , Dc <$ char 'c'
+    , Dd <$ char 'd'
+    , De <$ char 'e'
+    , Df <$ char 'f'
+    , DA <$ char 'A'
+    , DB <$ char 'B'
+    , DC <$ char 'C'
+    , DD <$ char 'D'
+    , DE <$ char 'E'
+    , DF <$ char 'F'
+    ]
+
+parseHexDigit4 ::
+  CharParsing f =>
+  f HexDigit4
+parseHexDigit4 =
+  HexDigit4 <$> parseHexDigit <*> parseHexDigit <*> parseHexDigit <*> parseHexDigit
+
+-- parseJCharUnescaped, parseJChar
