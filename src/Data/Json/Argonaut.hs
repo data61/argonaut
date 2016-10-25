@@ -10,7 +10,7 @@
 
 module Data.Json.Argonaut where
 
-import Control.Applicative as Applicative((*>))
+import Control.Applicative as Applicative((*>), (<*))
 import Control.Applicative(Alternative((<|>), many))
 import Data.Foldable(asum)
 import Text.Parser.Char
@@ -215,7 +215,7 @@ data Json s =
 newtype Jsons s =
   Jsons {
     _jsonsL ::
-      [Json s]
+      [(s, Json s, s)]
   } deriving (Eq, Ord, Show)
 
 
@@ -467,31 +467,31 @@ parseJChar =
 
 -- |
 --
--- >>> testparse parseJString ""
+-- >>> testparse parseJString "\"\""
 -- Right (JString [])
 --
--- >>> testparse parseJString "abc"
+-- >>> testparse parseJString "\"abc\""
 -- Right (JString [UnescapedJChar (JCharUnescaped 'a'),UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c')])
 --
--- >>> testparse parseJString "a\\rbc"
+-- >> testparse parseJString "\"a\\rbc\""
 -- Right (JString [UnescapedJChar (JCharUnescaped 'a'),EscapedJChar CarriageReturn,UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c')])
 --
--- >>> testparse parseJString "a\\rbc\\uab12\\ndef\\\""
+-- >>> testparse parseJString "\"a\\rbc\\uab12\\ndef\\\"\""
 -- Right (JString [UnescapedJChar (JCharUnescaped 'a'),EscapedJChar CarriageReturn,UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c'),EscapedJChar (Hex ab12),EscapedJChar LineFeed,UnescapedJChar (JCharUnescaped 'd'),UnescapedJChar (JCharUnescaped 'e'),UnescapedJChar (JCharUnescaped 'f'),EscapedJChar QuotationMark])
 --
--- >>> testparsetheneof parseJString ""
+-- >>> testparsetheneof parseJString "\"\""
 -- Right (JString [])
 --
--- >>> testparsetheneof parseJString "abc"
+-- >>> testparsetheneof parseJString "\"abc\""
 -- Right (JString [UnescapedJChar (JCharUnescaped 'a'),UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c')])
 --
--- >>> testparsethennoteof parseJString "a\\u"
+-- >>> testparsethennoteof parseJString "\"a\"\\u"
 -- Right (JString [UnescapedJChar (JCharUnescaped 'a')])
 --
--- >>> testparsethennoteof parseJString "a\t"
+-- >>> testparsethennoteof parseJString "\"a\"\t"
 -- Right (JString [UnescapedJChar (JCharUnescaped 'a')])
 parseJString ::
   CharParsing f =>
   f JString
 parseJString =
-  JString <$> many parseJChar
+  char '"' Applicative.*> (JString <$> many parseJChar) Applicative.<* char '"'
