@@ -18,6 +18,8 @@ import Text.Parser.Combinators
 import Data.Text(Text)
 import Papa
 
+import qualified Prelude as Prelude(error, undefined)
+
 -- $setup
 -- >>> :set -XNoImplicitPrelude
 -- >>> :set -XFlexibleContexts
@@ -190,16 +192,26 @@ newtype JNumber =
 data JAssoc s =
   JAssoc {
     _key ::
-      Text
+      LeadingTrailing JString s
   , _value ::
-      Json s
+      LeadingTrailing (Json s) s
   }
   deriving (Eq, Ord, Show)
 
 newtype JObject s =
   JObject {
     _jobjectL ::
-      [JAssoc s]
+      [LeadingTrailing (JAssoc s) s]
+  } deriving (Eq, Ord, Show)
+
+data LeadingTrailing a s =
+  LeadingTrailing {
+    _leading ::
+      s
+  , _a ::
+      a
+  , _trailing ::
+      s
   } deriving (Eq, Ord, Show)
 
 --  http://rfc7159.net/rfc7159
@@ -215,7 +227,7 @@ data Json s =
 newtype Jsons s =
   Jsons {
     _jsonsL ::
-      [(s, Json s, s)]
+      [LeadingTrailing (Json s) s]
   } deriving (Eq, Ord, Show)
 
 
@@ -284,6 +296,20 @@ parseJsonBool ::
 parseJsonBool p =
   let b q t = JsonBool q <$ text t <*> p
   in  b False "false" <|> b True "true"
+
+parseJNumber ::
+  CharParsing f =>
+  f (JNumber)
+parseJNumber =
+  -- todo
+  parseJNumber
+
+parseJsonNumber ::
+  CharParsing f =>
+  f s
+  -> f (Json s)
+parseJsonNumber p =
+  JsonNumber <$> parseJNumber <*> p
 
 -- |
 --
@@ -495,3 +521,103 @@ parseJString ::
   f JString
 parseJString =
   char '"' Applicative.*> (JString <$> many parseJChar) Applicative.<* char '"'
+
+-- |
+--
+-- >>> testparse (parseJsonString (return ())) "\"\""
+-- Right (JsonString (JString []) ())
+--
+-- >>> testparse (parseJsonString (return ())) "\"abc\""
+-- Right (JsonString (JString [UnescapedJChar (JCharUnescaped 'a'),UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c')]) ())
+--
+-- >> testparse (parseJsonString (return ())) "\"a\\rbc\""
+-- Right (JsonString (JString [UnescapedJChar (JCharUnescaped 'a'),EscapedJChar CarriageReturn,UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c'),EscapedJChar (Hex ab12),EscapedJChar LineFeed,UnescapedJChar (JCharUnescaped 'd'),UnescapedJChar (JCharUnescaped 'e'),UnescapedJChar (JCharUnescaped 'f'),EscapedJChar QuotationMark]) ())
+--
+-- >>> testparse (parseJsonString (return ())) "\"a\\rbc\\uab12\\ndef\\\"\""
+-- Right (JsonString (JString [UnescapedJChar (JCharUnescaped 'a'),EscapedJChar CarriageReturn,UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c'),EscapedJChar (Hex ab12),EscapedJChar LineFeed,UnescapedJChar (JCharUnescaped 'd'),UnescapedJChar (JCharUnescaped 'e'),UnescapedJChar (JCharUnescaped 'f'),EscapedJChar QuotationMark]) ())
+--
+-- >>> testparsetheneof (parseJsonString (return ())) "\"\""
+-- Right (JsonString (JString []) ())
+--
+-- >>> testparsetheneof (parseJsonString (return ())) "\"abc\""
+-- Right (JsonString (JString [UnescapedJChar (JCharUnescaped 'a'),UnescapedJChar (JCharUnescaped 'b'),UnescapedJChar (JCharUnescaped 'c')]) ())
+--
+-- >>> testparsethennoteof (parseJsonString (return ())) "\"a\"\\u"
+-- Right (JsonString (JString [UnescapedJChar (JCharUnescaped 'a')]) ())
+--
+-- >>> testparsethennoteof (parseJsonString (return ())) "\"a\"\t"
+-- Right (JsonString (JString [UnescapedJChar (JCharUnescaped 'a')]) ())
+parseJsonString ::
+  CharParsing f =>
+  f s
+  -> f (Json s)
+parseJsonString p =
+  JsonString <$> parseJString <*> p
+
+parseJsons ::
+  CharParsing f =>
+  f s
+  -> f (Jsons s)
+parseJsons s =
+  Jsons <$>
+    (
+      char '[' Applicative.*>
+      sepBy (parseLeadingTrailing s (parseJson s)) (char ',') Applicative.<*
+      char ']'
+    )
+
+parseJsonArray ::
+  CharParsing f =>
+  f s
+  -> f (Json s)
+parseJsonArray p =
+  JsonArray <$> parseJsons p <*> p
+
+parseJAssoc ::
+  CharParsing f =>
+  f s
+  -> f (JAssoc s)
+parseJAssoc s =
+  JAssoc <$> parseLeadingTrailing s parseJString Applicative.<* char ':' <*> parseLeadingTrailing s (parseJson s)
+
+parseJObject ::
+  CharParsing f =>
+  f s
+  -> f (JObject s)
+parseJObject s =
+  JObject <$>
+    (
+      char '{' Applicative.*>
+      sepBy (parseLeadingTrailing s (parseJAssoc s)) (char ',') Applicative.<*
+      char '}'
+    )
+
+parseJsonObject ::
+  CharParsing f =>
+  f s
+  -> f (Json s)
+parseJsonObject p =
+  JsonObject <$> parseJObject p <*> p
+
+parseJson ::
+  CharParsing f =>
+  f s
+  -> f (Json s)
+parseJson =  
+  asum . sequence
+    [
+      parseJsonNull 
+    , parseJsonBool 
+    , parseJsonNumber
+    , parseJsonString 
+    , parseJsonArray 
+    , parseJsonObject 
+    ]
+
+parseLeadingTrailing ::
+  Applicative f =>
+  f s
+  -> f a
+  -> f (LeadingTrailing a s)
+parseLeadingTrailing s a =
+  LeadingTrailing <$> s <*> a <*> s
