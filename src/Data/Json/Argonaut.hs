@@ -20,7 +20,7 @@ import Data.Maybe
 import Text.Parser.Char
 import Text.Parser.Combinators
 -- import Data.Text(Text)
-import Papa
+import Papa hiding (exp)
 
 -- import qualified Prelude as Prelude(error, undefined)
 
@@ -188,11 +188,144 @@ newtype JString =
     [JChar]
   deriving (Eq, Ord, Show)
 
-newtype JNumber =
+data Digit1to9 =
+  D1_1to9
+  | D2_1to9
+  | D3_1to9
+  | D4_1to9
+  | D5_1to9
+  | D6_1to9
+  | D7_1to9
+  | D8_1to9
+  | D9_1to9
+  deriving (Eq, Ord, Show)
+
+instance D9 Digit1to9 where
+  d9 =
+    prism'
+      (\() -> D9_1to9)
+      (\d -> case d of
+               D9_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D8 Digit1to9 where
+  d8 =
+    prism'
+      (\() -> D8_1to9)
+      (\d -> case d of
+               D8_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D7 Digit1to9 where
+  d7 =
+    prism'
+      (\() -> D7_1to9)
+      (\d -> case d of
+               D7_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D6 Digit1to9 where
+  d6 =
+    prism'
+      (\() -> D6_1to9)
+      (\d -> case d of
+               D6_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D5 Digit1to9 where
+  d5 =
+    prism'
+      (\() -> D5_1to9)
+      (\d -> case d of
+               D5_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D4 Digit1to9 where
+  d4 =
+    prism'
+      (\() -> D4_1to9)
+      (\d -> case d of
+               D4_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D3 Digit1to9 where
+  d3 =
+    prism'
+      (\() -> D3_1to9)
+      (\d -> case d of
+               D3_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D2 Digit1to9 where
+  d2 =
+    prism'
+      (\() -> D2_1to9)
+      (\d -> case d of
+               D2_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+instance D1 Digit1to9 where
+  d1 =
+    prism'
+      (\() -> D1_1to9)
+      (\d -> case d of
+               D1_1to9 ->
+                 Just ()
+               _ ->
+                 Nothing)
+
+data JInt =
+  JZero
+  | JIntInt Digit1to9 [Digit]
+  deriving (Eq, Ord, Show)
+
+data E =
+  EE
+  | Ee
+  deriving (Eq, Ord, Show)
+
+newtype Frac =
+  Frac
+    (NonEmpty Digit)
+  deriving (Eq, Ord, Show)
+
+data Exp =
+  Exp {
+    _ex ::
+      E
+  , _minusplus ::
+     Bool
+  , _expdigits ::
+     NonEmpty Digit
+  }
+  deriving (Eq, Ord, Show)
+
+data JNumber =
   JNumber {
-    _jnumber ::
-      Double
-  } deriving (Eq, Ord, Show)
+    _minus ::
+      Bool
+  , _numberint ::
+      JInt
+  , _fracexp :: 
+      Maybe (Frac, Maybe Exp)
+  }
+  deriving (Eq, Ord, Show)
 
 data JAssoc s =
   JAssoc {
@@ -244,8 +377,13 @@ makeClassyPrisms ''JCharEscaped
 makeClassy ''JChar
 makeClassyPrisms ''JChar
 makeWrapped ''JString
+makeClassy ''JInt
+makeClassyPrisms ''JInt
+makeClassy ''E
+makeClassyPrisms ''E
+makeWrapped ''Frac
+makeClassy ''Exp
 makeClassy ''JNumber
-makeWrapped ''JNumber
 makeClassy ''JAssoc
 makeClassy ''JObject
 makeWrapped ''JObject
@@ -302,15 +440,8 @@ parseJsonBool p =
   let b q t = JsonBool q <$ text t <*> p
   in  b False "false" <|> b True "true"
 
-parseJNumber ::
-  CharParsing f =>
-  f (JNumber)
-parseJNumber =
-  -- todo
-  parseJNumber
-
 parseJsonNumber ::
-  CharParsing f =>
+  (Monad f, CharParsing f) =>
   f s
   -> f (Json s)
 parseJsonNumber p =
@@ -453,7 +584,7 @@ parseJCharEscaped ::
   CharParsing f =>
   f JCharEscaped
 parseJCharEscaped =
-  let e =
+  let z =
         asum
           ((\(c, p) -> char c Applicative.*> pure p) <$>
             [
@@ -468,7 +599,7 @@ parseJCharEscaped =
             ])
       h =
         Hex <$> (char 'u' Applicative.*> parseHexDigit4)
-  in  char '\\' Applicative.*> (e <|> h)
+  in  char '\\' Applicative.*> (z <|> h)
 
 -- |
 --
@@ -560,7 +691,7 @@ parseJsonString p =
   JsonString <$> parseJString <*> p
 
 parseJsons ::
-  CharParsing f =>
+  (Monad f, CharParsing f) =>
   f s
   -> f (Jsons s)
 parseJsons s =
@@ -572,21 +703,21 @@ parseJsons s =
     )
 
 parseJsonArray ::
-  CharParsing f =>
+  (Monad f, CharParsing f) =>
   f s
   -> f (Json s)
 parseJsonArray p =
   JsonArray <$> parseJsons p <*> p
 
 parseJAssoc ::
-  CharParsing f =>
+  (Monad f, CharParsing f) =>
   f s
   -> f (JAssoc s)
 parseJAssoc s =
   JAssoc <$> parseLeadingTrailing s parseJString Applicative.<* char ':' <*> parseLeadingTrailing s (parseJson s)
 
 parseJObject ::
-  CharParsing f =>
+  (Monad f, CharParsing f) =>
   f s
   -> f (JObject s)
 parseJObject s =
@@ -598,14 +729,14 @@ parseJObject s =
     )
 
 parseJsonObject ::
-  CharParsing f =>
+  (Monad f, CharParsing f) =>
   f s
   -> f (Json s)
 parseJsonObject p =
   JsonObject <$> parseJObject p <*> p
 
 parseJson ::
-  CharParsing f =>
+  (Monad f, CharParsing f) =>
   f s
   -> f (Json s)
 parseJson =  
@@ -628,18 +759,6 @@ parseLeadingTrailing s a =
   LeadingTrailing <$> s <*> a <*> s
 
 ----
-
-data Digit1to9 =
-  D1_1to9
-  | D2_1to9
-  | D3_1to9
-  | D4_1to9
-  | D5_1to9
-  | D6_1to9
-  | D7_1to9
-  | D8_1to9
-  | D9_1to9
-  deriving (Eq, Ord, Show)
 
 -- |
 --
@@ -688,27 +807,22 @@ parseDigit1to9 =
   , D9_1to9 <$ char '9'
   ]
 
-data JInt =
-  JZero
-  | JInt Digit1to9 [Digit]
-  deriving (Eq, Ord, Show)
-
 -- |
 --
 -- >>> testparse parseJInt "1"
--- Right (JInt D1_1to9 [])
+-- Right (JIntInt D1_1to9 [])
 --
 -- >>> testparse parseJInt "9"
--- Right (JInt D9_1to9 [])
+-- Right (JIntInt D9_1to9 [])
 --
 -- >>> testparse parseJInt "10"
--- Right (JInt D1_1to9 [0])
+-- Right (JIntInt D1_1to9 [0])
 --
 -- >>> testparse parseJInt "39"
--- Right (JInt D3_1to9 [9])
+-- Right (JIntInt D3_1to9 [9])
 --
 -- >>> testparse parseJInt "393564"
--- Right (JInt D3_1to9 [9,3,5,6,4])
+-- Right (JIntInt D3_1to9 [9,3,5,6,4])
 --
 -- >>> testparse parseJInt "0"
 -- Right JZero
@@ -720,19 +834,19 @@ data JInt =
 -- Right JZero
 --
 -- >>> testparsetheneof parseJInt "1"
--- Right (JInt D1_1to9 [])
+-- Right (JIntInt D1_1to9 [])
 --
 -- >>> testparsetheneof parseJInt "9"
--- Right (JInt D9_1to9 [])
+-- Right (JIntInt D9_1to9 [])
 --
 -- >>> testparsetheneof parseJInt "10"
--- Right (JInt D1_1to9 [0])
+-- Right (JIntInt D1_1to9 [0])
 --
 -- >>> testparsetheneof parseJInt "39"
--- Right (JInt D3_1to9 [9])
+-- Right (JIntInt D3_1to9 [9])
 --
 -- >>> testparsetheneof parseJInt "393564"
--- Right (JInt D3_1to9 [9,3,5,6,4])
+-- Right (JIntInt D3_1to9 [9,3,5,6,4])
 --
 -- >>> testparsetheneof parseJInt "0"
 -- Right JZero
@@ -748,13 +862,8 @@ parseJInt ::
 parseJInt =
   asum [
     JZero <$ try (char '0')
-  , JInt <$> parseDigit1to9 <*> parsedigitlist
+  , JIntInt <$> parseDigit1to9 <*> parsedigitlist
   ]
-
-data E =
-  EE
-  | Ee
-  deriving (Eq, Ord, Show)
 
 -- |
 --
@@ -786,12 +895,6 @@ parseE =
     Ee <$ try (char 'e')
   , EE <$ char 'E'
   ]
-
-newtype Frac =
-  Frac
-    (NonEmpty Digit)
-  deriving (Eq, Ord, Show)
-
 
 -- |
 --
@@ -827,27 +930,16 @@ parseFrac ::
 parseFrac =
   Frac <$> some1 parsedigit
 
-data Exp =
-  Exp {
-    _e ::
-      E
-  , _minusplus ::
-     Bool
-  , _expdigits ::
-     NonEmpty Digit
-  }
-  deriving (Eq, Ord, Show)
-
 -- |
 --
 -- >>> testparsethen parseExp "e+10x"
--- Right (Exp {_e = Ee, _minusplus = False, _expdigits = 1 :| [0]},'x')
+-- Right (Exp {_ex = Ee, _minusplus = False, _expdigits = 1 :| [0]},'x')
 --
 -- >>> testparsethen parseExp "e-0x"
--- Right (Exp {_e = Ee, _minusplus = True, _expdigits = 0 :| []},'x')
+-- Right (Exp {_ex = Ee, _minusplus = True, _expdigits = 0 :| []},'x')
 --
 -- >>> testparsethen parseExp "E-1x"
--- Right (Exp {_e = EE, _minusplus = True, _expdigits = 1 :| []},'x')
+-- Right (Exp {_ex = EE, _minusplus = True, _expdigits = 1 :| []},'x')
 parseExp ::
   (Monad f, CharParsing f) =>
   f Exp  
@@ -879,47 +971,36 @@ number = [ minus ] int [ frac ] [ exp ]
    zero = %x30                ; 0
 -}
 
-data JNumba =
-  JNumba {
-    _minus ::
-      Bool
-  , _numberint ::
-      JInt
-  , _fracexp :: 
-      Maybe (Frac, Maybe Exp)
-  }
-  deriving (Eq, Ord, Show)
-
 -- |
 --
--- >>> testparsethen parseJNumba "3x"
--- Right (JNumba {_minus = False, _numberint = JInt D3_1to9 [], _fracexp = Nothing},'x')
+-- >>> testparsethen parseJNumber "3x"
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Nothing},'x')
 --
--- >>> testparsethen parseJNumba "-3x"
--- Right (JNumba {_minus = True, _numberint = JInt D3_1to9 [], _fracexp = Nothing},'x')
+-- >>> testparsethen parseJNumber "-3x"
+-- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Nothing},'x')
 --
--- >>> testparsethen parseJNumba "0x"
--- Right (JNumba {_minus = False, _numberint = JZero, _fracexp = Nothing},'x')
+-- >>> testparsethen parseJNumber "0x"
+-- Right (JNumber {_minus = False, _numberint = JZero, _fracexp = Nothing},'x')
 --
--- >>> testparsethen parseJNumba "-0x"
--- Right (JNumba {_minus = True, _numberint = JZero, _fracexp = Nothing},'x')
+-- >>> testparsethen parseJNumber "-0x"
+-- Right (JNumber {_minus = True, _numberint = JZero, _fracexp = Nothing},'x')
 --
--- >>> testparsethen parseJNumba "3.45x"
--- Right (JNumba {_minus = False, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
+-- >>> testparsethen parseJNumber "3.45x"
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
 --
--- >>> testparsethen parseJNumba "-3.45x"
--- Right (JNumba {_minus = True, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
+-- >>> testparsethen parseJNumber "-3.45x"
+-- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
 --
--- >>> testparsethen parseJNumba "3.45e+10x"
--- Right (JNumba {_minus = False, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_e = Ee, _minusplus = False, _expdigits = 1 :| [0]}))},'x')
+-- >>> testparsethen parseJNumber "3.45e+10x"
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = False, _expdigits = 1 :| [0]}))},'x')
 --
--- >>> testparsethen parseJNumba "-3.45e-02x"
--- Right (JNumba {_minus = True, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_e = Ee, _minusplus = True, _expdigits = 0 :| [2]}))},'x')
-parseJNumba ::
+-- >>> testparsethen parseJNumber "-3.45e-02x"
+-- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = True, _expdigits = 0 :| [2]}))},'x')
+parseJNumber ::
   (Monad f, CharParsing f) =>
-  f JNumba  
-parseJNumba =
-  JNumba <$>
+  f JNumber
+parseJNumber =
+  JNumber <$>
     isJust <$> optional (try (char '-')) <*>
     parseJInt <*>
     optional ((,) <$ char '.' <*> parseFrac <*> optional parseExp)
