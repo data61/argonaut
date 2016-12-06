@@ -949,28 +949,6 @@ parseExp =
     asum [False <$ char '+', True <$ char '-'] <*>
     parsedigitlist1
 
-{-
-number = [ minus ] int [ frac ] [ exp ]
-
-   decimal-point = %x2E       ; .
-
-   digit1-9 = %x31-39         ; 1-9
-
-   e = %x65 / %x45            ; e E
-
-   exp = e [ minus / plus ] 1*DIGIT
-
-   frac = decimal-point 1*DIGIT
-
-   int = zero / ( digit1-9 *DIGIT )
-
-   minus = %x2D               ; -
-
-   plus = %x2B                ; +
-
-   zero = %x30                ; 0
--}
-
 -- |
 --
 -- >>> testparsethen parseJNumber "3x"
