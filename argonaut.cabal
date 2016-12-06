@@ -33,6 +33,7 @@ library
                     , text          
                     , text1
                     , parsers      
+                    , digit
                     , papa
 
                     , parsec

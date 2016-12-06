@@ -1,3 +1,4 @@
+
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -12,13 +13,16 @@ module Data.Json.Argonaut where
 
 import Control.Applicative as Applicative((*>), (<*))
 import Control.Applicative(Alternative((<|>), many))
+import Data.Digit
+import Data.List.NonEmpty
 import Data.Foldable(asum)
+import Data.Maybe
 import Text.Parser.Char
 import Text.Parser.Combinators
-import Data.Text(Text)
+-- import Data.Text(Text)
 import Papa
 
-import qualified Prelude as Prelude(error, undefined)
+-- import qualified Prelude as Prelude(error, undefined)
 
 -- $setup
 -- >>> :set -XNoImplicitPrelude
@@ -33,6 +37,7 @@ import qualified Prelude as Prelude(error, undefined)
 -- >>> let testparse :: Parsec Text () a -> Text -> Either ParseError a; testparse p = parse p "test"
 -- >>> let testparsetheneof :: Parsec Text () a -> Text -> Either ParseError a; testparsetheneof p = testparse (p Applicative.<* eof)
 -- >>> let testparsethennoteof :: Parsec Text () a -> Text -> Either ParseError a; testparsethennoteof p = testparse (p Applicative.<* anyChar)
+-- >>> let testparsethen :: Parsec Text () a -> Text -> Either ParseError (a, Char); testparsethen p = parse ((,) <$> p <*> Text.Parser.Char.anyChar) "test"
 
 ----
 
@@ -116,13 +121,13 @@ data HexDigit4 =
   deriving (Eq, Ord)
 
 instance Show HexDigit4 where
-  show (HexDigit4 d1 d2 d3 d4) =
+  show (HexDigit4 q1 q2 q3 q4) =
     concat
       [
-        show d1
-      , show d2
-      , show d3
-      , show d4
+        show q1
+      , show q2
+      , show q3
+      , show q4
       ]
 
 newtype JCharUnescaped =
@@ -621,3 +626,307 @@ parseLeadingTrailing ::
   -> f (LeadingTrailing a s)
 parseLeadingTrailing s a =
   LeadingTrailing <$> s <*> a <*> s
+
+----
+
+data Digit1to9 =
+  D1_1to9
+  | D2_1to9
+  | D3_1to9
+  | D4_1to9
+  | D5_1to9
+  | D6_1to9
+  | D7_1to9
+  | D8_1to9
+  | D9_1to9
+  deriving (Eq, Ord, Show)
+
+-- |
+--
+-- >>> testparse parseDigit1to9 "1"
+-- Right D1_1to9
+--
+-- >>> testparse parseDigit1to9 "9"
+-- Right D9_1to9
+--
+-- >>> testparse parseDigit1to9 "5"
+-- Right D5_1to9
+--
+-- >>> testparsetheneof parseDigit1to9 "1"
+-- Right D1_1to9
+--
+-- >>> testparsetheneof parseDigit1to9 "9"
+-- Right D9_1to9
+--
+-- >>> testparsetheneof parseDigit1to9 "5"
+-- Right D5_1to9
+--
+-- >>> isLeft (testparsetheneof parseDigit1to9 "0")
+-- True
+--
+-- >>> testparsethennoteof parseDigit1to9 "1a"
+-- Right D1_1to9
+--
+-- >>> testparsethennoteof parseDigit1to9 "9a"
+-- Right D9_1to9
+--
+-- >>> testparsethennoteof parseDigit1to9 "5a"
+-- Right D5_1to9
+parseDigit1to9 ::
+  CharParsing f =>
+  f Digit1to9
+parseDigit1to9 =
+  asum [
+    D1_1to9 <$ char '1'
+  , D2_1to9 <$ char '2'
+  , D3_1to9 <$ char '3'
+  , D4_1to9 <$ char '4'
+  , D5_1to9 <$ char '5'
+  , D6_1to9 <$ char '6'
+  , D7_1to9 <$ char '7'
+  , D8_1to9 <$ char '8'
+  , D9_1to9 <$ char '9'
+  ]
+
+data JInt =
+  JZero
+  | JInt Digit1to9 [Digit]
+  deriving (Eq, Ord, Show)
+
+-- |
+--
+-- >>> testparse parseJInt "1"
+-- Right (JInt D1_1to9 [])
+--
+-- >>> testparse parseJInt "9"
+-- Right (JInt D9_1to9 [])
+--
+-- >>> testparse parseJInt "10"
+-- Right (JInt D1_1to9 [0])
+--
+-- >>> testparse parseJInt "39"
+-- Right (JInt D3_1to9 [9])
+--
+-- >>> testparse parseJInt "393564"
+-- Right (JInt D3_1to9 [9,3,5,6,4])
+--
+-- >>> testparse parseJInt "0"
+-- Right JZero
+--
+-- >>> testparsethennoteof parseJInt "00"
+-- Right JZero
+--
+-- >>> testparsethennoteof parseJInt "01"
+-- Right JZero
+--
+-- >>> testparsetheneof parseJInt "1"
+-- Right (JInt D1_1to9 [])
+--
+-- >>> testparsetheneof parseJInt "9"
+-- Right (JInt D9_1to9 [])
+--
+-- >>> testparsetheneof parseJInt "10"
+-- Right (JInt D1_1to9 [0])
+--
+-- >>> testparsetheneof parseJInt "39"
+-- Right (JInt D3_1to9 [9])
+--
+-- >>> testparsetheneof parseJInt "393564"
+-- Right (JInt D3_1to9 [9,3,5,6,4])
+--
+-- >>> testparsetheneof parseJInt "0"
+-- Right JZero
+--
+-- >>> isLeft (testparse parseJInt "x")
+-- True
+--
+-- >>> isLeft (testparse parseJInt "")
+-- True
+parseJInt ::
+  (Monad f, CharParsing f) =>
+  f JInt
+parseJInt =
+  asum [
+    JZero <$ try (char '0')
+  , JInt <$> parseDigit1to9 <*> parsedigitlist
+  ]
+
+data E =
+  EE
+  | Ee
+  deriving (Eq, Ord, Show)
+
+-- |
+--
+-- >>> testparse parseE "e"
+-- Right Ee
+--
+-- >>> testparse parseE "E"
+-- Right EE
+--
+-- >>> testparsetheneof parseE "e"
+-- Right Ee
+--
+-- >>> testparsetheneof parseE "E"
+-- Right EE
+--
+-- >>> isLeft (testparsetheneof parseE "x")
+-- True
+--
+-- >>> testparsethennoteof parseE "ea"
+-- Right Ee
+--
+-- >>> testparsethennoteof parseE "Ea"
+-- Right EE
+parseE ::
+  CharParsing f =>
+  f E
+parseE =
+  asum [
+    Ee <$ try (char 'e')
+  , EE <$ char 'E'
+  ]
+
+newtype Frac =
+  Frac
+    (NonEmpty Digit)
+  deriving (Eq, Ord, Show)
+
+
+-- |
+--
+-- >>> testparsetheneof parseFrac "1"
+-- Right (Frac (1 :| []))
+--
+-- >>> testparsetheneof parseFrac "9"
+-- Right (Frac (9 :| []))
+--
+-- >>> testparsetheneof parseFrac "10"
+-- Right (Frac (1 :| [0]))
+--
+-- >>> testparsetheneof parseFrac "39"
+-- Right (Frac (3 :| [9]))
+--
+-- >>> testparsetheneof parseFrac "393564"
+-- Right (Frac (3 :| [9,3,5,6,4]))
+--
+-- >>> testparsetheneof parseFrac "0"
+-- Right (Frac (0 :| []))
+--
+-- >>> testparsetheneof parseFrac "00"
+-- Right (Frac (0 :| [0]))
+--
+-- >>> testparsetheneof parseFrac "01"
+-- Right (Frac (0 :| [1]))
+--
+-- >>> testparsethennoteof parseFrac "01x"
+-- Right (Frac (0 :| [1]))
+parseFrac ::
+  (Monad f, CharParsing f) =>
+  f Frac  
+parseFrac =
+  Frac <$> some1 parsedigit
+
+data Exp =
+  Exp {
+    _e ::
+      E
+  , _minusplus ::
+     Bool
+  , _expdigits ::
+     NonEmpty Digit
+  }
+  deriving (Eq, Ord, Show)
+
+-- |
+--
+-- >>> testparsethen parseExp "e+10x"
+-- Right (Exp {_e = Ee, _minusplus = False, _expdigits = 1 :| [0]},'x')
+--
+-- >>> testparsethen parseExp "e-0x"
+-- Right (Exp {_e = Ee, _minusplus = True, _expdigits = 0 :| []},'x')
+--
+-- >>> testparsethen parseExp "E-1x"
+-- Right (Exp {_e = EE, _minusplus = True, _expdigits = 1 :| []},'x')
+parseExp ::
+  (Monad f, CharParsing f) =>
+  f Exp  
+parseExp =
+  Exp <$>
+    parseE <*>
+    asum [False <$ char '+', True <$ char '-'] <*>
+    parsedigitlist1
+
+{-
+number = [ minus ] int [ frac ] [ exp ]
+
+   decimal-point = %x2E       ; .
+
+   digit1-9 = %x31-39         ; 1-9
+
+   e = %x65 / %x45            ; e E
+
+   exp = e [ minus / plus ] 1*DIGIT
+
+   frac = decimal-point 1*DIGIT
+
+   int = zero / ( digit1-9 *DIGIT )
+
+   minus = %x2D               ; -
+
+   plus = %x2B                ; +
+
+   zero = %x30                ; 0
+-}
+
+data Sign =
+  Minus
+  | Plus
+  | Nosign
+  deriving (Eq, Ord, Show)
+
+data JNumba =
+  JNumba {
+    _minus ::
+      Bool
+  , _numberint ::
+      JInt
+  , _fracexp :: 
+      Maybe (Frac, Maybe Exp)
+  }
+  deriving (Eq, Ord, Show)
+
+-- |
+--
+-- >>> testparsethen parseJNumba "3x"
+-- Right (JNumba {_minus = False, _numberint = JInt D3_1to9 [], _fracexp = Nothing},'x')
+--
+-- >>> testparsethen parseJNumba "-3x"
+-- Right (JNumba {_minus = True, _numberint = JInt D3_1to9 [], _fracexp = Nothing},'x')
+--
+-- >>> testparsethen parseJNumba "0x"
+-- Right (JNumba {_minus = False, _numberint = JZero, _fracexp = Nothing},'x')
+--
+-- >>> testparsethen parseJNumba "-0x"
+-- Right (JNumba {_minus = True, _numberint = JZero, _fracexp = Nothing},'x')
+--
+-- >>> testparsethen parseJNumba "3.45x"
+-- Right (JNumba {_minus = False, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
+--
+-- >>> testparsethen parseJNumba "-3.45x"
+-- Right (JNumba {_minus = True, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
+--
+-- >>> testparsethen parseJNumba "3.45e+10x"
+-- Right (JNumba {_minus = False, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_e = Ee, _minusplus = False, _expdigits = 1 :| [0]}))},'x')
+--
+-- >>> testparsethen parseJNumba "-3.45e-02x"
+-- Right (JNumba {_minus = True, _numberint = JInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_e = Ee, _minusplus = True, _expdigits = 0 :| [2]}))},'x')
+parseJNumba ::
+  (Monad f, CharParsing f) =>
+  f JNumba  
+parseJNumba =
+  JNumba <$>
+    isJust <$> optional (try (char '-')) <*>
+    parseJInt <*>
+    optional ((,) <$ char '.' <*> parseFrac <*> optional parseExp)
+    
