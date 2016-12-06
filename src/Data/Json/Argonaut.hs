@@ -879,12 +879,6 @@ number = [ minus ] int [ frac ] [ exp ]
    zero = %x30                ; 0
 -}
 
-data Sign =
-  Minus
-  | Plus
-  | Nosign
-  deriving (Eq, Ord, Show)
-
 data JNumba =
   JNumba {
     _minus ::
