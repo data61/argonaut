@@ -323,8 +323,10 @@ data JNumber =
       Bool
   , _numberint ::
       JInt
-  , _fracexp ::
-      Maybe (Frac, Maybe Exp)
+  , _frac ::
+      Maybe Frac
+  , _expn ::
+      Maybe Exp
   }
   deriving (Eq, Ord, Show)
 
@@ -1000,31 +1002,40 @@ parseExp =
 -- |
 --
 -- >>> testparsethen parseJNumber "3x"
--- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Nothing},'x')
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _frac = Nothing, _expn = Nothing},'x')
 --
 -- >>> testparsethen parseJNumber "-3x"
--- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Nothing},'x')
+-- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _frac = Nothing, _expn = Nothing},'x')
 --
 -- >>> testparsethen parseJNumber "0x"
--- Right (JNumber {_minus = False, _numberint = JZero, _fracexp = Nothing},'x')
+-- Right (JNumber {_minus = False, _numberint = JZero, _frac = Nothing, _expn = Nothing},'x')
 --
 -- >>> testparsethen parseJNumber "-0x"
--- Right (JNumber {_minus = True, _numberint = JZero, _fracexp = Nothing},'x')
+-- Right (JNumber {_minus = True, _numberint = JZero, _frac = Nothing, _expn = Nothing},'x')
 --
 -- >>> testparsethen parseJNumber "3.45x"
--- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _frac = Just (Frac (4 :| [5])), _expn = Nothing},'x')
 --
 -- >>> testparsethen parseJNumber "-3.45x"
--- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
+-- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _frac = Just (Frac (4 :| [5])), _expn = Nothing},'x')
 --
 -- >>> testparsethen parseJNumber "3.45e10x"
--- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = Nothing, _expdigits = 1 :| [0]}))},'x')
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _frac = Just (Frac (4 :| [5])), _expn = Just (Exp {_ex = Ee, _minusplus = Nothing, _expdigits = 1 :| [0]})},'x')
+--
+-- >>> testparsethen parseJNumber "3e10x"
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _frac = Nothing, _expn = Just (Exp {_ex = Ee, _minusplus = Nothing, _expdigits = 1 :| [0]})},'x')
 --
 -- >>> testparsethen parseJNumber "3.45e+10x"
--- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = Just False, _expdigits = 1 :| [0]}))},'x')
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _frac = Just (Frac (4 :| [5])), _expn = Just (Exp {_ex = Ee, _minusplus = Just False, _expdigits = 1 :| [0]})},'x')
 --
 -- >>> testparsethen parseJNumber "-3.45e-02x"
--- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = Just True, _expdigits = 0 :| [2]}))},'x')
+-- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _frac = Just (Frac (4 :| [5])), _expn = Just (Exp {_ex = Ee, _minusplus = Just True, _expdigits = 0 :| [2]})},'x')
+--
+-- >>> isLeft (testparsethen parseJNumber "-3.45ex")
+-- True
+--
+-- >>> isLeft (testparsethen parseJNumber "-.45e1x")
+-- True
 parseJNumber ::
   (Monad f, CharParsing f) =>
   f JNumber
@@ -1032,5 +1043,8 @@ parseJNumber =
   JNumber <$>
     isJust <$> optional (char '-') <*>
     parseJInt <*>
-    optional ((,) <$ char '.' <*> parseFrac <*> optional parseExp)
+    optional (char '.' Applicative.*> parseFrac) <*>
+    optional parseExp
 
+-- toScientific :: JSNumber -> Scientific
+-- toScientific (JSNumber sign ) = undefined
