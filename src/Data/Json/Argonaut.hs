@@ -1,4 +1,6 @@
 
+{-# LANGUAGE DeriveFunctor          #-}
+{-# LANGUAGE DeriveTraversable      #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
@@ -335,11 +337,42 @@ data JAssoc s =
   }
   deriving (Eq, Ord, Show)
 
+instance Functor JAssoc where
+    fmap f (JAssoc k v) = JAssoc (fmap f k) ((\x -> x{_a = fmap f (_a x)}) . fmap f $ v)
+
+instance Foldable JAssoc where
+    foldMap f (JAssoc k v) = mconcat [foldMap f k, foldMap' v] where
+        foldMap' (LeadingTrailing l x r) = mconcat [f l, foldMap f x, f r]
+
+instance Traversable JAssoc where
+    traverse f (JAssoc k v) = JAssoc <$> traverse f k <*> traverse' v where
+        traverse' (LeadingTrailing l x r) =
+            LeadingTrailing
+                <$> f l
+                <*> traverse f x
+                <*> f r
+
 newtype JObject s =
   JObject {
     _jobjectL ::
       [LeadingTrailing (JAssoc s) s]
   } deriving (Eq, Ord, Show)
+
+instance Functor JObject where
+    fmap f (JObject ls) = JObject (fmap fmap' ls) where
+        fmap' (LeadingTrailing l x r) =
+            LeadingTrailing (f l) (fmap f x) (f r)
+
+instance Foldable JObject where
+    foldMap f (JObject ls) = mconcat (fmap (foldMap f) ls)
+
+instance Traversable JObject where
+    traverse f (JObject ls) = JObject <$> traverse traverse' ls where
+        traverse' (LeadingTrailing l x r) =
+            LeadingTrailing
+                <$> f l
+                <*> traverse f x
+                <*> f r
 
 data LeadingTrailing a s =
   LeadingTrailing {
@@ -349,7 +382,7 @@ data LeadingTrailing a s =
       a
   , _trailing ::
       s
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 --  http://rfc7159.net/rfc7159
 data Json s =
@@ -359,7 +392,7 @@ data Json s =
   | JsonString JString s
   | JsonArray (Jsons s) s
   | JsonObject (JObject s) s
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 newtype Jsons s =
   Jsons {
@@ -367,6 +400,19 @@ newtype Jsons s =
       [LeadingTrailing (Json s) s]
   } deriving (Eq, Ord, Show)
 
+instance Functor Jsons where
+    fmap f (Jsons ls) = Jsons (fmap ((\x -> x{_a = fmap f (_a x)}) . fmap f) ls)
+
+instance Foldable Jsons where
+    foldMap f (Jsons ls) = mconcat (fmap (foldMap f) ls)
+
+instance Traversable Jsons where
+    traverse f (Jsons ls) = Jsons <$> traverse traverse' ls where
+        traverse' (LeadingTrailing l x r) =
+            LeadingTrailing
+                <$> f l
+                <*> traverse f x
+                <*> f r
 
 makeClassy ''HexDigit
 makeClassyPrisms ''HexDigit
