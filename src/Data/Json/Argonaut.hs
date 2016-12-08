@@ -1,26 +1,26 @@
 
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeFamilies           #-}
 
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes             #-}
 
 module Data.Json.Argonaut where
 
-import Control.Applicative as Applicative((*>), (<*))
-import Control.Applicative(Alternative((<|>), many))
-import Data.Digit
-import Data.List.NonEmpty
-import Data.Foldable(asum)
-import Data.Maybe
-import Text.Parser.Char
-import Text.Parser.Combinators
+import           Control.Applicative     as Applicative ((*>), (<*))
+import           Control.Applicative     (Alternative (many, (<|>)))
+import           Data.Digit
+import           Data.Foldable           (asum)
+import           Data.List.NonEmpty
+import           Data.Maybe
+import           Text.Parser.Char
+import           Text.Parser.Combinators
 -- import Data.Text(Text)
-import Papa hiding (exp)
+import           Papa                    hiding (exp)
 
 -- import qualified Prelude as Prelude(error, undefined)
 
@@ -111,7 +111,7 @@ instance Show HexDigit where
     "E"
   show DF =
     "F"
-    
+
 data HexDigit4 =
   HexDigit4
     HexDigit
@@ -309,7 +309,7 @@ data Exp =
     _ex ::
       E
   , _minusplus ::
-     Bool
+     Maybe Bool
   , _expdigits ::
      NonEmpty Digit
   }
@@ -321,7 +321,7 @@ data JNumber =
       Bool
   , _numberint ::
       JInt
-  , _fracexp :: 
+  , _fracexp ::
       Maybe (Frac, Maybe Exp)
   }
   deriving (Eq, Ord, Show)
@@ -393,13 +393,13 @@ makeWrapped ''Jsons
 
 -- |
 --
--- >>> testparse (parseJsonNull (return ())) "null" 
+-- >>> testparse (parseJsonNull (return ())) "null"
 -- Right (JsonNull ())
 --
--- >>> testparsetheneof (parseJsonNull (return ())) "null" 
+-- >>> testparsetheneof (parseJsonNull (return ())) "null"
 -- Right (JsonNull ())
 --
--- >>> testparsethennoteof (parseJsonNull (return ())) "nullx" 
+-- >>> testparsethennoteof (parseJsonNull (return ())) "nullx"
 -- Right (JsonNull ())
 --
 -- prop> x /= "null" ==> isLeft (testparse (parseJsonNull (return ())) x)
@@ -412,22 +412,22 @@ parseJsonNull p =
 
 -- |
 --
--- >>> testparse (parseJsonBool (return ())) "true" 
+-- >>> testparse (parseJsonBool (return ())) "true"
 -- Right (JsonBool True ())
 --
--- >>> testparse (parseJsonBool (return ())) "false" 
+-- >>> testparse (parseJsonBool (return ())) "false"
 -- Right (JsonBool False ())
 ---
--- >>> testparsetheneof (parseJsonBool (return ())) "true" 
+-- >>> testparsetheneof (parseJsonBool (return ())) "true"
 -- Right (JsonBool True ())
 --
--- >>> testparsetheneof (parseJsonBool (return ())) "false" 
+-- >>> testparsetheneof (parseJsonBool (return ())) "false"
 -- Right (JsonBool False ())
 ---
--- >>> testparsethennoteof (parseJsonBool (return ())) "truex" 
+-- >>> testparsethennoteof (parseJsonBool (return ())) "truex"
 -- Right (JsonBool True ())
 --
--- >>> testparsethennoteof (parseJsonBool (return ())) "falsex" 
+-- >>> testparsethennoteof (parseJsonBool (return ())) "falsex"
 -- Right (JsonBool False ())
 --
 -- prop> (x `notElem` ["true", "false"]) ==> isLeft (testparse (parseJsonBool (return ())) x)
@@ -448,31 +448,31 @@ parseJsonNumber p =
 
 -- |
 --
--- >>> testparse parseHexDigit "0" 
+-- >>> testparse parseHexDigit "0"
 -- Right 0
 --
--- >>> testparse parseHexDigit "1" 
+-- >>> testparse parseHexDigit "1"
 -- Right 1
 --
--- >>> testparse parseHexDigit "9" 
+-- >>> testparse parseHexDigit "9"
 -- Right 9
 --
--- >>> testparse parseHexDigit "a" 
+-- >>> testparse parseHexDigit "a"
 -- Right a
 --
--- >>> testparse parseHexDigit "f" 
+-- >>> testparse parseHexDigit "f"
 -- Right f
 --
--- >>> testparse parseHexDigit "A" 
+-- >>> testparse parseHexDigit "A"
 -- Right A
 --
--- >>> testparse parseHexDigit "F" 
+-- >>> testparse parseHexDigit "F"
 -- Right F
 --
--- >>> testparsetheneof parseHexDigit "F" 
+-- >>> testparsetheneof parseHexDigit "F"
 -- Right F
 --
--- >>> testparsethennoteof parseHexDigit "Fx" 
+-- >>> testparsethennoteof parseHexDigit "Fx"
 -- Right F
 parseHexDigit ::
   CharParsing f =>
@@ -528,16 +528,16 @@ parseHexDigit4 =
 
 -- |
 --
--- >>> testparse parseJCharUnescaped "a" 
+-- >>> testparse parseJCharUnescaped "a"
 -- Right (JCharUnescaped 'a')
 --
--- >>> testparse parseJCharUnescaped "\8728" 
+-- >>> testparse parseJCharUnescaped "\8728"
 -- Right (JCharUnescaped '\8728')
 --
--- >>> testparsetheneof parseJCharUnescaped "a" 
+-- >>> testparsetheneof parseJCharUnescaped "a"
 -- Right (JCharUnescaped 'a')
 --
--- >>> testparsethennoteof parseJCharUnescaped "ax" 
+-- >>> testparsethennoteof parseJCharUnescaped "ax"
 -- Right (JCharUnescaped 'a')
 parseJCharUnescaped ::
   CharParsing f =>
@@ -738,15 +738,15 @@ parseJson ::
   (Monad f, CharParsing f) =>
   f s
   -> f (Json s)
-parseJson =  
+parseJson =
   asum . sequence
     [
-      parseJsonNull 
-    , parseJsonBool 
+      parseJsonNull
+    , parseJsonBool
     , parseJsonNumber
-    , parseJsonString 
-    , parseJsonArray 
-    , parseJsonObject 
+    , parseJsonString
+    , parseJsonArray
+    , parseJsonObject
     ]
 
 parseLeadingTrailing ::
@@ -925,27 +925,30 @@ parseE =
 -- Right (Frac (0 :| [1]))
 parseFrac ::
   (Monad f, CharParsing f) =>
-  f Frac  
+  f Frac
 parseFrac =
   Frac <$> some1 parsedigit
 
 -- |
 --
+-- >>> testparsethen parseExp "e10x"
+-- Right (Exp {_ex = Ee, _minusplus = Nothing, _expdigits = 1 :| [0]},'x')
+--
 -- >>> testparsethen parseExp "e+10x"
--- Right (Exp {_ex = Ee, _minusplus = False, _expdigits = 1 :| [0]},'x')
+-- Right (Exp {_ex = Ee, _minusplus = Just False, _expdigits = 1 :| [0]},'x')
 --
 -- >>> testparsethen parseExp "e-0x"
--- Right (Exp {_ex = Ee, _minusplus = True, _expdigits = 0 :| []},'x')
+-- Right (Exp {_ex = Ee, _minusplus = Just True, _expdigits = 0 :| []},'x')
 --
 -- >>> testparsethen parseExp "E-1x"
--- Right (Exp {_ex = EE, _minusplus = True, _expdigits = 1 :| []},'x')
+-- Right (Exp {_ex = EE, _minusplus = Just True, _expdigits = 1 :| []},'x')
 parseExp ::
   (Monad f, CharParsing f) =>
-  f Exp  
+  f Exp
 parseExp =
   Exp <$>
     parseE <*>
-    asum [False <$ char '+', True <$ char '-'] <*>
+    optional (asum [False <$ char '+', True <$ char '-']) <*>
     parsedigitlist1
 
 -- |
@@ -968,11 +971,14 @@ parseExp =
 -- >>> testparsethen parseJNumber "-3.45x"
 -- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Nothing)},'x')
 --
+-- >>> testparsethen parseJNumber "3.45e10x"
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = Nothing, _expdigits = 1 :| [0]}))},'x')
+--
 -- >>> testparsethen parseJNumber "3.45e+10x"
--- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = False, _expdigits = 1 :| [0]}))},'x')
+-- Right (JNumber {_minus = False, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = Just False, _expdigits = 1 :| [0]}))},'x')
 --
 -- >>> testparsethen parseJNumber "-3.45e-02x"
--- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = True, _expdigits = 0 :| [2]}))},'x')
+-- Right (JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _fracexp = Just (Frac (4 :| [5]),Just (Exp {_ex = Ee, _minusplus = Just True, _expdigits = 0 :| [2]}))},'x')
 parseJNumber ::
   (Monad f, CharParsing f) =>
   f JNumber
@@ -981,4 +987,4 @@ parseJNumber =
     isJust <$> optional (char '-') <*>
     parseJInt <*>
     optional ((,) <$ char '.' <*> parseFrac <*> optional parseExp)
-    
+
