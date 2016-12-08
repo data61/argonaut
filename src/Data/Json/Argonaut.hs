@@ -122,13 +122,12 @@ data HexDigit4 =
 
 instance Show HexDigit4 where
   show (HexDigit4 q1 q2 q3 q4) =
-    concat
-      [
-        show q1
-      , show q2
-      , show q3
-      , show q4
-      ]
+    [
+      q1
+    , q2
+    , q3
+    , q4
+    ] >>= show
 
 newtype JCharUnescaped =
   JCharUnescaped
