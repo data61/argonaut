@@ -979,7 +979,7 @@ parseJNumber ::
   f JNumber
 parseJNumber =
   JNumber <$>
-    isJust <$> optional (try (char '-')) <*>
+    isJust <$> optional (char '-') <*>
     parseJInt <*>
     optional ((,) <$ char '.' <*> parseFrac <*> optional parseExp)
     
