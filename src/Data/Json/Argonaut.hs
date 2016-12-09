@@ -1,4 +1,5 @@
 
+{-# LANGUAGE BangPatterns           #-}
 {-# LANGUAGE DeriveFunctor          #-}
 {-# LANGUAGE DeriveTraversable      #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -17,12 +18,16 @@ import           Control.Applicative     as Applicative ((*>), (<*))
 import           Control.Applicative     (Alternative (many, (<|>)))
 import           Data.Digit
 import           Data.Foldable           (asum)
+import           Data.List               (length)
 import           Data.List.NonEmpty
 import           Data.Maybe
+import           Data.Scientific         (Scientific, scientific)
 import           Text.Parser.Char
 import           Text.Parser.Combinators
 -- import Data.Text(Text)
 import           Papa                    hiding (exp)
+
+import           Prelude                 (maxBound, minBound)
 
 -- import qualified Prelude as Prelude(error, undefined)
 
@@ -290,6 +295,32 @@ instance D1 Digit1to9 where
                  Just ()
                _ ->
                  Nothing)
+
+digit1to9toDigit :: Prism' Digit Digit1to9
+digit1to9toDigit = prism'
+    (\x -> case x of
+        D1_1to9 -> x1
+        D2_1to9 -> x2
+        D3_1to9 -> x3
+        D4_1to9 -> x4
+        D5_1to9 -> x5
+        D6_1to9 -> x6
+        D7_1to9 -> x7
+        D8_1to9 -> x8
+        D9_1to9 -> x9)
+    (\x -> asum
+            [ x1 <$ x ^? d1
+            , x2 <$ x ^? d2
+            , x3 <$ x ^? d3
+            , x4 <$ x ^? d4
+            , x5 <$ x ^? d5
+            , x6 <$ x ^? d6
+            , x7 <$ x ^? d7
+            , x8 <$ x ^? d8
+            , x9 <$ x ^? d9
+            ]
+    )
+
 
 data JInt =
   JZero
@@ -1046,5 +1077,55 @@ parseJNumber =
     optional (char '.' Applicative.*> parseFrac) <*>
     optional parseExp
 
--- toScientific :: JSNumber -> Scientific
--- toScientific (JSNumber sign ) = undefined
+
+-- | Returns a normalised 'Scientific' value or Nothing if the exponent
+--   is out of the range @[minBound,maxBound::Int]@
+--
+-- >>> jNumberToScientific JNumber {_minus = True, _numberint = JIntInt D3_1to9 [], _frac = Just (Frac (x4 :| [x5])), _expn = Just (Exp {_ex = Ee, _minusplus = Just True, _expdigits = x0 :| [x2]})}
+-- Just -3.45e-2
+--
+-- >>> jNumberToScientific JNumber {_minus = True, _numberint = JIntInt D1_1to9 [x2,x3], _frac = Just (Frac (x4 :| [x5,x6])), _expn = Just (Exp {_ex = Ee, _minusplus = Just True, _expdigits = x7 :| [x8,x9]})}
+-- Just -1.23456e-787
+--
+-- >>> jNumberToScientific JNumber {_minus = True, _numberint = JIntInt D1_1to9 [x2,x3], _frac = Just (Frac (x4 :| [x5,x6])), _expn = Just (Exp {_ex = Ee, _minusplus = Just False, _expdigits = x7 :| [x8,x9]})}
+-- Just -1.23456e791
+--
+
+jNumberToScientific :: JNumber -> Maybe Scientific
+jNumberToScientific (JNumber sign int mfrac mexp) =
+    if nexp > fromIntegral (maxBound :: Int) ||
+       nexp < fromIntegral (minBound :: Int)
+         then Nothing
+         else Just (scientific ncoeff (fromInteger nexp))
+    where
+        intDigs       = jIntToDigits int
+
+        fracList      = mfrac ^.. _Just . _Wrapped . traverse
+        exponentShift = Data.List.length fracList
+
+        coeff         = neg (Just sign) (digitlist # intDigs ++ fracList)
+
+        expon         = maybe 0 expval mexp - fromIntegral exponentShift
+
+        (ncoeff,nexp) = normaliseExponent coeff expon
+
+        neg (Just True) = negate
+        neg _           = id
+
+        expval (Exp _ msign digs) = neg msign (digitlist # toList digs)
+
+        normaliseExponent :: Integer -> Integer -> (Integer,Integer)
+        normaliseExponent coef !expo = case coef `divMod` 10 of
+            (coef',0) -> normaliseExponent coef' (expo+1)
+            _         -> (coef, expo)
+
+
+
+jIntToInteger :: JInt -> Integer
+jIntToInteger jsi =
+    digitlist # jIntToDigits jsi
+
+
+jIntToDigits :: JInt -> [Digit]
+jIntToDigits JZero = [x0]
+jIntToDigits (JIntInt d ds) = digit1to9toDigit # d : fmap (view hasdigit) ds

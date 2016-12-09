@@ -35,6 +35,7 @@ library
                     , parsers      
                     , digit
                     , papa
+                    , scientific
 
                     , parsec
                     , QuickCheck
