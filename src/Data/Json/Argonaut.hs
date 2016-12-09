@@ -22,10 +22,10 @@ import           Data.List               (length)
 import           Data.List.NonEmpty
 import           Data.Maybe
 import           Data.Scientific         (Scientific, scientific)
+import           Data.Text               as Text (Text, pack)
+import           Papa                    hiding (exp)
 import           Text.Parser.Char
 import           Text.Parser.Combinators
--- import Data.Text(Text)
-import           Papa                    hiding (exp)
 
 import           Data.Char               (chr)
 import           Prelude                 (maxBound, minBound)
@@ -1131,11 +1131,17 @@ jIntToDigits :: JInt -> [Digit]
 jIntToDigits JZero = [x0]
 jIntToDigits (JIntInt d ds) = digit1to9toDigit # d : fmap (view hasdigit) ds
 
+-- | Convert a 'JString' to a strict 'Text'
+--
+-- >>> jStringToText (JString [EscapedJChar Tab, UnescapedJChar (JCharUnescaped '1'), EscapedJChar (Hex (HexDigit4 D1 D2 D3 D4)), UnescapedJChar (JCharUnescaped '2')])
+-- "\t1\4660\&2"
+jStringToText :: JString -> Text
+jStringToText (JString jcs) = Text.pack (jCharToChar <$> jcs)
 
 jCharToChar :: JChar -> Char
 jCharToChar (UnescapedJChar (JCharUnescaped c)) = c
 jCharToChar (EscapedJChar jca) = case jca of
-    QuotationMark  -> '?'
+    QuotationMark  -> '"'
     ReverseSolidus -> '\\'
     Solidus        -> '/'
     Backspace      -> '\b'
@@ -1144,7 +1150,7 @@ jCharToChar (EscapedJChar jca) = case jca of
     CarriageReturn -> '\r'
     Tab            -> '\t'
     Hex (HexDigit4 a b c d) ->
-        chr (hexToInt d + 16*(hexToInt c + 16*(hexToInt b + 16*hexToInt a)))
+        chr (foldl (\acc x -> 16*acc + hexToInt x) 0 [a,b,c,d])
 
 hexToInt :: HexDigit -> Int
 hexToInt h = case h of
