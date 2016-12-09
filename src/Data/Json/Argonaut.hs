@@ -27,6 +27,7 @@ import           Text.Parser.Combinators
 -- import Data.Text(Text)
 import           Papa                    hiding (exp)
 
+import           Data.Char               (chr)
 import           Prelude                 (maxBound, minBound)
 
 -- import qualified Prelude as Prelude(error, undefined)
@@ -1129,3 +1130,43 @@ jIntToInteger jsi =
 jIntToDigits :: JInt -> [Digit]
 jIntToDigits JZero = [x0]
 jIntToDigits (JIntInt d ds) = digit1to9toDigit # d : fmap (view hasdigit) ds
+
+
+jCharToChar :: JChar -> Char
+jCharToChar (UnescapedJChar (JCharUnescaped c)) = c
+jCharToChar (EscapedJChar jca) = case jca of
+    QuotationMark  -> '?'
+    ReverseSolidus -> '\\'
+    Solidus        -> '/'
+    Backspace      -> '\b'
+    FormFeed       -> '\f'
+    LineFeed       -> '\n'
+    CarriageReturn -> '\r'
+    Tab            -> '\t'
+    Hex (HexDigit4 a b c d) ->
+        chr (hexToInt d + 16*(hexToInt c + 16*(hexToInt b + 16*hexToInt a)))
+
+hexToInt :: HexDigit -> Int
+hexToInt h = case h of
+    D0 -> 0
+    D1 -> 1
+    D2 -> 2
+    D3 -> 3
+    D4 -> 4
+    D5 -> 5
+    D6 -> 6
+    D7 -> 7
+    D8 -> 8
+    D9 -> 9
+    Da -> 10
+    Db -> 11
+    Dc -> 12
+    Dd -> 13
+    De -> 14
+    Df -> 15
+    DA -> 10
+    DB -> 11
+    DC -> 12
+    DD -> 13
+    DE -> 14
+    DF -> 15
