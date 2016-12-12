@@ -517,7 +517,7 @@ parseJsonBool ::
   -> f (Json s)
 parseJsonBool p =
   let b q t = JsonBool q <$ text t <*> p
-  in  b False "false" <|> b True "true"
+  in  (b False "false" <|> b True "true") <?> "bool 'true' or 'false'"
 
 parseJsonNumber ::
   (Monad f, CharParsing f) =>
@@ -582,7 +582,7 @@ parseHexDigit =
     , DD <$ char 'D'
     , DE <$ char 'E'
     , DF <$ char 'F'
-    ]
+    ] <?> "hex digit [0-9a-fA-F]"
 
 -- |
 --
@@ -623,7 +623,7 @@ parseJCharUnescaped ::
   CharParsing f =>
   f JCharUnescaped
 parseJCharUnescaped =
-  JCharUnescaped <$> satisfy (has _JCharUnescaped)
+  JCharUnescaped <$> satisfy (has _JCharUnescaped) <?> "unescaped char"
 
 -- |
 --
@@ -665,7 +665,7 @@ parseJCharEscaped ::
 parseJCharEscaped =
   let z =
         asum
-          ((\(c, p) -> char c Applicative.*> pure p) <$>
+          ((\(c, p) -> (char c <?> concat [show p, " (", show c,")"]) Applicative.*> pure p) <$>
             [
               ('"' , QuotationMark)
             , ('\\', ReverseSolidus)
@@ -677,8 +677,8 @@ parseJCharEscaped =
             , ('t' , Tab)
             ])
       h =
-        Hex <$> (char 'u' Applicative.*> parseHexDigit4)
-  in  char '\\' Applicative.*> (z <|> h)
+        Hex <$> ((char 'u' Applicative.*> parseHexDigit4) <?> "hex escaped character '\\uNNNN'")
+  in  char '\\' Applicative.*> (z <|> h) <?> "escaped character"
 
 -- |
 --
@@ -702,7 +702,7 @@ parseJChar ::
 parseJChar =
   asum
     [
-      EscapedJChar <$> try parseJCharEscaped
+      EscapedJChar <$> parseJCharEscaped
     , UnescapedJChar <$> parseJCharUnescaped
     ]
 
@@ -735,7 +735,9 @@ parseJString ::
   CharParsing f =>
   f JString
 parseJString =
-  char '"' Applicative.*> (JString <$> many parseJChar) Applicative.<* char '"'
+  (char '"' <?> "opening quote \'\"\'") Applicative.*>
+  (JString <$> many parseJChar) Applicative.<*
+  (char '"' <?> "closing quote \'\"\'")
 
 -- |
 --
@@ -776,9 +778,9 @@ parseJsons ::
 parseJsons s =
   Jsons <$>
     (
-      char '[' Applicative.*>
-      sepBy (parseLeadingTrailing s (parseJson s)) (char ',') Applicative.<*
-      char ']'
+      (char '[' <?> "array opening \'[\'") Applicative.*>
+      sepBy (parseLeadingTrailing s (parseJson s)) (char ',' <?> "array seperator ','") Applicative.<*
+      (char ']' <?> "array closing ']'")
     )
 
 parseJsonArray ::
@@ -793,7 +795,9 @@ parseJAssoc ::
   f s
   -> f (JAssoc s)
 parseJAssoc s =
-  JAssoc <$> parseLeadingTrailing s parseJString Applicative.<* char ':' <*> parseLeadingTrailing s (parseJson s)
+  JAssoc <$> (parseLeadingTrailing s parseJString <?> "object key")
+         Applicative.<* (char ':' <?> "object seperator ':'")
+         <*> parseLeadingTrailing s (parseJson s)
 
 parseJObject ::
   (Monad f, CharParsing f) =>
@@ -802,9 +806,9 @@ parseJObject ::
 parseJObject s =
   JObject <$>
     (
-      char '{' Applicative.*>
+      (char '{' <?> "object opening '{'") Applicative.*>
       sepBy (parseLeadingTrailing s (parseJAssoc s)) (char ',') Applicative.<*
-      char '}'
+      (char '}' <?> "object closing '{'")
     )
 
 parseJsonObject ::
@@ -821,12 +825,12 @@ parseJson ::
 parseJson =
   asum . sequence
     [
-      parseJsonNull
-    , parseJsonBool
-    , parseJsonNumber
-    , parseJsonString
-    , parseJsonArray
-    , parseJsonObject
+      (<?> "null") . parseJsonNull
+    , (<?> "bool") . parseJsonBool
+    , (<?> "number") . parseJsonNumber
+    , (<?> "string") . parseJsonString
+    , (<?> "array") . parseJsonArray
+    , (<?> "object") . parseJsonObject
     ]
 
 parseLeadingTrailing ::
@@ -884,7 +888,7 @@ parseDigit1to9 =
   , D7_1to9 <$ char '7'
   , D8_1to9 <$ char '8'
   , D9_1to9 <$ char '9'
-  ]
+  ] <?> "digit [1-9]"
 
 -- |
 --
@@ -971,7 +975,7 @@ parseE ::
   f E
 parseE =
   asum [
-    Ee <$ try (char 'e')
+    Ee <$ char 'e'
   , EE <$ char 'E'
   ]
 
@@ -1007,7 +1011,7 @@ parseFrac ::
   (Monad f, CharParsing f) =>
   f Frac
 parseFrac =
-  Frac <$> some1 parsedigit
+  Frac <$> some1 parsedigit <?> "fractional digits"
 
 -- |
 --
@@ -1029,7 +1033,7 @@ parseExp =
   Exp <$>
     parseE <*>
     optional (asum [False <$ char '+', True <$ char '-']) <*>
-    parsedigitlist1
+    (parsedigitlist1 <?> "exponent digits")
 
 -- |
 --
@@ -1074,9 +1078,9 @@ parseJNumber ::
 parseJNumber =
   JNumber <$>
     isJust <$> optional (char '-') <*>
-    parseJInt <*>
-    optional (char '.' Applicative.*> parseFrac) <*>
-    optional parseExp
+    (parseJInt <?> "number integral") <*>
+    (optional (char '.' Applicative.*> parseFrac) <?> "fractional digits") <*>
+    (optional parseExp <?> "exponent")
 
 
 -- | Returns a normalised 'Scientific' value or Nothing if the exponent
