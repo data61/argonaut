@@ -808,7 +808,7 @@ parseJObject s =
     (
       (char '{' <?> "object opening '{'") Applicative.*>
       sepBy (parseLeadingTrailing s (parseJAssoc s)) (char ',') Applicative.<*
-      (char '}' <?> "object closing '{'")
+      (char '}' <?> "object closing '}'")
     )
 
 parseJsonObject ::
